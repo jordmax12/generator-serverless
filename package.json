@@ -1,5 +1,5 @@
 {
-  "name": "jordan-serverless-generator",
+  "name": "generator-serverless",
   "version": "1.0.0",
   "description": "Below are the steps required to run this app local.",
   "main": "index.js",
@@ -7,5 +7,12 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "decamelize": "^4.0.0",
+    "fs": "0.0.1-security",
+    "uppercamelcase": "^3.0.0",
+    "yaml": "^1.10.0",
+    "yeoman-generator": "^4.11.0"
+  }
 }
