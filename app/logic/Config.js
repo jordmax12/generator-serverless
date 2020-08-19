@@ -64,21 +64,57 @@ class Config {
         return string.charAt(0).toUpperCase() + string.slice(1);
     }
 
+    async create_directory(path) {
+        if (!fs.existsSync(path)){
+            fs.mkdirSync(path);
+        }
+    }
+
     async serverless_file() {
         console.log('logging __dirname', path.join(__dirname, '..'))
         let doc = yaml.safeLoad(fs.readFileSync(`${path.join(__dirname, '..')}/templates/serverless.yml`, 'utf8'));
         doc.app = this._config.app;
         doc.service = this._config.service;
         if (this._config.custom) doc.custom = this._config.custom;
+        this.build_directories();
         const resource = this.build_dynamo_db();
 
-        return fs.writeFile('./test.yml', yaml.safeDump(doc), (err) => {
+        doc.resources = [];
+        doc.resources.push('${file(./aws/resources/dynamodb.yml)}');
+
+        return fs.writeFile('./serverless.yml', yaml.safeDump(doc), (err) => {
             if (err) {
                 console.log(err);
             }
-
+            
             Promise.resolve(true);
         });
+    }
+
+    async build_directories() {
+        const paths = [
+            'application',
+            'application/v1',
+            'application/v1/controller',
+            'application/v1/controller/apigateway',
+            'application/v1/logic',
+            'application/v1/logic/factories',
+            'application/v1/model',
+            'aws',
+            'aws/envs',
+            'aws/iamroles',
+            'aws/resources'
+        ]
+
+        paths.forEach(path => this.create_directory(path))
+        // application / v1 / controller
+        // application / v1 / controller / apigateway
+        // application / v1 / logic
+        // application / v1 / logic / factories
+        // application / v1 / model
+        // aws / envs
+        // aws / iamroles
+        // aws / resources
     }
 
     async build_dynamo_db() {
@@ -182,7 +218,7 @@ class Config {
             final.Resources[this.jsUcfirst(key)] = resource;
           }
 
-          return fs.writeFile('./dynamodb.yml', yaml.safeDump(final), (err) => {
+          return fs.writeFile('./aws/resources/dynamodb.yml', yaml.safeDump(final), (err) => {
             if (err) {
                 console.log(err);
             }
@@ -211,7 +247,6 @@ class Config {
     async open_api() {
 
     }
-
 
     async buildspec() {
 

@@ -18,7 +18,7 @@ module.exports = class extends Generator {
         message : 'Enter a name for the new component (i.e.: myNewComponent): '
       }
     ]).then(async (answers) => {
-      let fileContents = fs.readFileSync('./sample.yml', 'utf8');
+      let fileContents = fs.readFileSync('./jordan.yml', 'utf8');
       let yaml_config = yaml.safeLoad(fileContents);
 
       const config = new ConfigLogic(yaml_config);

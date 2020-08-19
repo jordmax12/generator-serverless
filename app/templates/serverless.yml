@@ -37,8 +37,9 @@ provider:
         service: ${self:service}
         environment: ${self:provider.stage}
         managedby: serverless
+    iamRoleStatements:
+        - override_me
 resources:
-    - override_me
 functions:
     v1-apigateway-handler:
         name: ${self:provider.stackTags.name}-v1-apigateway-handler
