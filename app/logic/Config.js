@@ -1,7 +1,7 @@
 const yaml = require('js-yaml');
 const fs = require('fs');
 const path = require("path");
-const { models: default_models, type: default_type, app: default_app, service: default_service} = require('./defaults/config');
+const { models: default_models, domain: default_domain, type: default_type, app: default_app, service: default_service} = require('./defaults/config');
 
 class Config {
     constructor(config) {
@@ -9,6 +9,7 @@ class Config {
             app: config.app || default_app,
             service: config.service || default_service,
             type: config.type || default_type,
+            domain: config.domain || default_domain,
             custom: config.custom,
             models: config.models || default_models
         };
@@ -77,7 +78,8 @@ class Config {
         doc.service = this._config.service;
         if (this._config.custom) doc.custom = this._config.custom;
         this.build_directories();
-        const resource = this.build_dynamo_db();
+        this.build_dynamo_db();
+        this.resources();
 
         doc.resources = [];
         doc.resources.push('${file(./aws/resources/dynamodb.yml)}');
@@ -218,7 +220,7 @@ class Config {
             final.Resources[this.jsUcfirst(key)] = resource;
           }
 
-          return fs.writeFile('./aws/resources/dynamodb.yml', yaml.safeDump(final), (err) => {
+        return fs.writeFile('./aws/resources/dynamodb.yml', yaml.safeDump(final), (err) => {
             if (err) {
                 console.log(err);
             }
@@ -228,8 +230,102 @@ class Config {
     }
 
     async resources() {
-        // dynamodb
         // apigateway
+        const final = {
+            Resources: {}
+        }
+
+        const apigateway_stage = {
+            ApiGatewayStage: {
+            Type: "AWS::ApiGateway::Stage",
+            Properties: {
+               StageName: "${self:provider.stage}",
+               DeploymentId: {
+                  Ref: "__deployment__"
+               },
+               RestApiId: {
+                  Ref: "ApiGatewayRestApi"
+               },
+               MethodSettings: [
+                  {
+                     ResourcePath: "/*",
+                     HttpMethod: "*",
+                     LoggingLevel: "INFO",
+                     DataTraceEnabled: true,
+                     MetricsEnabled: true
+                  }
+               ]
+            }
+         }
+        }
+
+        const apigateway_base_path_mapping = 
+        {
+            ApiGatewayPublicBasePathMapping: {
+                Type: "AWS::ApiGateway::BasePathMapping",
+                Properties: {
+                    BasePath: "${self:app}-${self:service}",
+                    DomainName: this._config.domain,
+                    RestApiId: {
+                    Ref: "ApiGatewayRestApi"
+                },
+                Stage: {
+                    Ref: "ApiGatewayStage"
+                }
+                }
+            }
+        }
+
+        final.Resources['ApiGatewayStage'] = apigateway_stage;
+        final.Resources['ApiGatewayPublicBasePathMapping'] = apigateway_base_path_mapping;
+
+        return fs.writeFile('./aws/resources/apigateway.yml', yaml.safeDump(final), (err) => {
+            if (err) {
+                console.log(err);
+            }
+
+            Promise.resolve(true);
+        });
+
+        // const resource = {
+        //     "Resources": {
+        //        "ApiGatewayStage": {
+        //           "Type": "AWS::ApiGateway::Stage",
+        //           "Properties": {
+        //              "StageName": "${self:provider.stage}",
+        //              "DeploymentId": {
+        //                 "Ref": "__deployment__"
+        //              },
+        //              "RestApiId": {
+        //                 "Ref": "ApiGatewayRestApi"
+        //              },
+        //              "MethodSettings": [
+        //                 {
+        //                    "ResourcePath": "/*",
+        //                    "HttpMethod": "*",
+        //                    "LoggingLevel": "INFO",
+        //                    "DataTraceEnabled": true,
+        //                    "MetricsEnabled": true
+        //                 }
+        //              ]
+        //           }
+        //        },
+        //        "ApiGatewayPublicBasePathMapping": {
+        //           "Type": "AWS::ApiGateway::BasePathMapping",
+        //           "Properties": {
+        //              "BasePath": "${self:app}-${self:service}",
+        //              "DomainName": "${self:provider.stage}-api.syndpe.com",
+        //              "RestApiId": {
+        //                 "Ref": "ApiGatewayRestApi"
+        //              },
+        //              "Stage": {
+        //                 "Ref": "ApiGatewayStage"
+        //              }
+        //           }
+        //        }
+        //     }
+        //  }
+
     }
 
     async mlc() {

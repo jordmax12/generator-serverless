@@ -1,6 +1,7 @@
 exports.app = 'jordans';
 exports.service = 'generator';
 exports.type = 'node';
+exports.domain = 'jordans-serverless-generator.com';
 exports.models = {
     employee: {
         ddb_config: {
