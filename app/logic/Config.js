@@ -286,46 +286,6 @@ class Config {
 
             Promise.resolve(true);
         });
-
-        // const resource = {
-        //     "Resources": {
-        //        "ApiGatewayStage": {
-        //           "Type": "AWS::ApiGateway::Stage",
-        //           "Properties": {
-        //              "StageName": "${self:provider.stage}",
-        //              "DeploymentId": {
-        //                 "Ref": "__deployment__"
-        //              },
-        //              "RestApiId": {
-        //                 "Ref": "ApiGatewayRestApi"
-        //              },
-        //              "MethodSettings": [
-        //                 {
-        //                    "ResourcePath": "/*",
-        //                    "HttpMethod": "*",
-        //                    "LoggingLevel": "INFO",
-        //                    "DataTraceEnabled": true,
-        //                    "MetricsEnabled": true
-        //                 }
-        //              ]
-        //           }
-        //        },
-        //        "ApiGatewayPublicBasePathMapping": {
-        //           "Type": "AWS::ApiGateway::BasePathMapping",
-        //           "Properties": {
-        //              "BasePath": "${self:app}-${self:service}",
-        //              "DomainName": "${self:provider.stage}-api.syndpe.com",
-        //              "RestApiId": {
-        //                 "Ref": "ApiGatewayRestApi"
-        //              },
-        //              "Stage": {
-        //                 "Ref": "ApiGatewayStage"
-        //              }
-        //           }
-        //        }
-        //     }
-        //  }
-
     }
 
     async mlc() {
