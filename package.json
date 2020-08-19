@@ -11,8 +11,8 @@
   "dependencies": {
     "decamelize": "^4.0.0",
     "fs": "0.0.1-security",
+    "js-yaml": "^3.14.0",
     "uppercamelcase": "^3.0.0",
-    "yaml": "^1.10.0",
     "yeoman-generator": "^4.11.0"
   }
 }

@@ -1,0 +1,181 @@
+Resources:
+    Fields:
+        Type: 'AWS::DynamoDB::Table'
+        Properties:
+            TableName: ${self:provider.stackTags.name}-fields
+            BillingMode: PAY_PER_REQUEST
+            StreamSpecification:
+                StreamViewType: ${self:custom.stream_view.${self:provider.stage}}
+            PointInTimeRecoverySpecification:
+                PointInTimeRecoveryEnabled: ${self:custom.ddb_recovery.${self:provider.stage}}
+            AttributeDefinitions:
+                -
+                    AttributeName: field_id
+                    AttributeType: S
+                -
+                    AttributeName: external_reference_id
+                    AttributeType: S
+                -
+                    AttributeName: field_name
+                    AttributeType: S
+                -
+                    AttributeName: farm_name
+                    AttributeType: S
+                -
+                    AttributeName: grower_id
+                    AttributeType: S
+                -
+                    AttributeName: grower_name
+                    AttributeType: S
+                -
+                    AttributeName: grower_salesforce_id
+                    AttributeType: S
+            KeySchema:
+                -
+                    AttributeName: field_id
+                    KeyType: HASH
+            GlobalSecondaryIndexes:
+                -
+                    IndexName: field_id
+                    KeySchema:
+                        -
+                            AttributeName: field_id
+                            KeyType: HASH
+                    Projection:
+                        ProjectionType: ALL
+                -
+                    IndexName: external_reference_id
+                    KeySchema:
+                        -
+                            AttributeName: external_reference_id
+                            KeyType: HASH
+                    Projection:
+                        ProjectionType: ALL
+                -
+                    IndexName: field_name
+                    KeySchema:
+                        -
+                            AttributeName: field_name
+                            KeyType: HASH
+                    Projection:
+                        ProjectionType: ALL
+                -
+                    IndexName: farm_name
+                    KeySchema:
+                        -
+                            AttributeName: farm_name
+                            KeyType: HASH
+                    Projection:
+                        ProjectionType: ALL
+                -
+                    IndexName: grower_id
+                    KeySchema:
+                        -
+                            AttributeName: grower_id
+                            KeyType: HASH
+                    Projection:
+                        ProjectionType: ALL
+                -
+                    IndexName: grower_salesforce_id
+                    KeySchema:
+                        -
+                            AttributeName: grower_salesforce_id
+                            KeyType: HASH
+                    Projection:
+                        ProjectionType: ALL
+                -
+                    IndexName: grower_name
+                    KeySchema:
+                        -
+                            AttributeName: grower_name
+                            KeyType: HASH
+                    Projection:
+                        ProjectionType: ALL
+    CropYear:
+        Type: 'AWS::DynamoDB::Table'
+        Properties:
+            TableName: ${self:provider.stackTags.name}-crop-years
+            BillingMode: PAY_PER_REQUEST
+            StreamSpecification:
+                StreamViewType: ${self:custom.stream_view.${self:provider.stage}}
+            PointInTimeRecoverySpecification:
+                PointInTimeRecoveryEnabled: ${self:custom.ddb_recovery.${self:provider.stage}}
+            AttributeDefinitions:
+                -
+                    AttributeName: crop_year
+                    AttributeType: S
+                -
+                    AttributeName: field_id
+                    AttributeType: S
+                -
+                    AttributeName: crop_id
+                    AttributeType: S
+                -
+                    AttributeName: crop_name
+                    AttributeType: S
+            KeySchema:
+                -
+                    AttributeName: field_id
+                    KeyType: HASH
+                -
+                    AttributeName: crop_year
+                    KeyType: RANGE
+            GlobalSecondaryIndexes:
+                -
+                    IndexName: crop_year
+                    KeySchema:
+                        -
+                            AttributeName: crop_year
+                            KeyType: HASH
+                    Projection:
+                        ProjectionType: ALL
+                -
+                    IndexName: field_id
+                    KeySchema:
+                        -
+                            AttributeName: field_id
+                            KeyType: HASH
+                    Projection:
+                        ProjectionType: ALL
+                -
+                    IndexName: crop_id
+                    KeySchema:
+                        -
+                            AttributeName: crop_id
+                            KeyType: HASH
+                    Projection:
+                        ProjectionType: ALL
+                -
+                    IndexName: crop_name
+                    KeySchema:
+                        -
+                            AttributeName: crop_name
+                            KeyType: HASH
+                    Projection:
+                        ProjectionType: ALL
+    IngestTracker:
+        Type: 'AWS::DynamoDB::Table'
+        Properties:
+            TableName: ${self:provider.stackTags.name}-ingest-tracker
+            BillingMode: PAY_PER_REQUEST
+            StreamSpecification:
+                StreamViewType: ${self:custom.stream_view.${self:provider.stage}}
+            PointInTimeRecoverySpecification:
+                PointInTimeRecoveryEnabled: ${self:custom.ddb_recovery.${self:provider.stage}}
+            AttributeDefinitions:
+                -
+                    AttributeName: tracker_id
+                    AttributeType: S
+            KeySchema:
+                -
+                    AttributeName: tracker_id
+                    KeyType: HASH
+            GlobalSecondaryIndexes:
+                -
+                    IndexName: tracker_id
+                    KeySchema:
+                        -
+                            AttributeName: tracker_id
+                            KeyType: HASH
+                    Projection:
+                        ProjectionType: ALL

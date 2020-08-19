@@ -1,0 +1,61 @@
+app: override_me
+service: override_me
+package:
+    individually: true
+    exclude:
+        - README.md
+        - buildspec.yml
+        - serverless.yml
+        - package.json
+        - package-lock.json
+custom:
+    authorizer: ${file(./aws/envs/${opt:aws_envs, 'local'}.yml):authorizer}
+    cors: ${file(./aws/envs/${opt:aws_envs, 'local'}.yml):cors}
+    arn: ${file(./aws/envs/${opt:aws_envs, 'local'}.yml):arn}
+    serverless-offline:
+        port: 9000
+        stage: local
+        prefix: ${self:app}-${self:service}
+        region: us-east-2
+        noAuth: true
+provider:
+    name: aws
+    runtime: nodejs12.x
+    logRetentionInDays: 3
+    versionFunctions: false
+    endpointType: regional
+    environment:  ${file(./aws/envs/${opt:aws/envs, 'local'}.yml):environment}
+    stage: ${opt:stage, 'local'}
+    region: ${opt:region, 'us-east-2'}
+    profile: ${opt:stage, 'local'}
+    stackName: ${self:provider.stackTags.name}
+    apiName: ${self:provider.stackTags.name}
+    deploymentBucket:
+        name: '${self:provider.stage}-syngenta-deployments'
+    stackTags:
+        name: ${self:provider.stage}-${self:app}-${self:service}
+        service: ${self:service}
+        environment: ${self:provider.stage}
+        managedby: serverless
+resources:
+    - override_me
+functions:
+    v1-apigateway-handler:
+        name: ${self:provider.stackTags.name}-v1-apigateway-handler
+        description: API Router handler
+        handler: application/v1/controller/apigateway/_router.route
+        provisionedConcurrency: override_me
+        memorySize: override_me
+        timeout: 30
+        events:
+            - http:
+                path: /
+                method: ANY
+                cors: override_me
+            - http:
+                path: /{proxy+}
+                method: ANY
+                cors: override_me
+plugins:
+    - serverless-plugin-bind-deployment-id
+    - serverless-offline

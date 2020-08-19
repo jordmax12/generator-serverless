@@ -1,6 +1,6 @@
 'use strict';
 const Generator = require('yeoman-generator');
-const YAML = require('yaml');
+const yaml = require('js-yaml');
 const fs = require('fs');
 const ConfigLogic = require('./logic/Config');
 
@@ -17,14 +17,13 @@ module.exports = class extends Generator {
         name    : 'name',
         message : 'Enter a name for the new component (i.e.: myNewComponent): '
       }
-    ]).then( (answers) => {
-      // create destination folder
-      // this.destinationRoot(answers.name);
-      // p arse config file
-      const file = fs.readFileSync('./sample.yml', 'utf8');
-      const yaml_config = YAML.parse(file);
+    ]).then(async (answers) => {
+      let fileContents = fs.readFileSync('./sample.yml', 'utf8');
+      let yaml_config = yaml.safeLoad(fileContents);
 
       const config = new ConfigLogic(yaml_config);
+
+      await config.serverless_file();
 
       console.log('logging config', JSON.stringify(config.export(), null, 4));
 
