@@ -10,6 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "decamelize": "^4.0.0",
+    "esformatter": "^0.11.3",
     "fs": "0.0.1-security",
     "js-yaml": "^3.14.0",
     "uppercamelcase": "^3.0.0",

@@ -1,6 +1,7 @@
 const yaml = require('js-yaml');
 const fs = require('fs');
 const path = require("path");
+const formatter = require('esformatter');
 const { models: default_models, domain: default_domain, type: default_type, app: default_app, service: default_service} = require('./defaults/config');
 
 class Config {
@@ -78,8 +79,9 @@ class Config {
         doc.service = this._config.service;
         if (this._config.custom) doc.custom = this._config.custom;
         this.build_directories();
-        this.build_dynamo_db();
-        this.resources();
+        await this.build_dynamo_db();
+        await this.resources();
+        await this.mlc();
 
         doc.resources = [];
         doc.resources.push('${file(./aws/resources/dynamodb.yml)}');
@@ -127,7 +129,6 @@ class Config {
         }
         for (const [key, value] of Object.entries(models)) {
             const { ddb_config, gets } = value;
-            console.log('logging key', key);
             // ddb_config - optional, if none supplied, just make gsi based off of key-id, we will make that the primary key.
             // ddb_config . range - optional the name of the resource (so use the id of that resource)
             // gets - optional array of properties supplied by user to make gsi's
@@ -289,7 +290,45 @@ class Config {
     }
 
     async mlc() {
+        // controller logic
+        // build out get, post, put and delete
+        // let someData = [{name: 'adman', tag: 'batsman', age: 25}];
+        // let jsonData = JSON.stringify(someData);
+        const { models } = this._config;
+        for(let i = 0; i < Object.keys(models).length; i++) {
+            const key = Object.keys(models)[i];
+            console.log('logging key', key);
+            const model = Object.values(models)[i];
+            const { gets } = model;
+            let code_template = `const validator = require('../../logic/validator');
+            const ${this.jsUcfirst(key)} = require('../../logic/${key}');
+            const ${key}Factory = require('../../logic/factories/${key}');
+            
+            exports.get = async (request, response) => {
+                if (validator.isValid${this.jsUcfirst(key)}Request(request, response)) {
+                    if(request.params.${key}_id) {
+                        const ${key} = await ${key}Factory.getById(request.params.${key}_id)
+                        response.body = ${key}.export();
+                    }
+                }
+            }`;
 
+            for(const get of gets) {
+                console.log('logging get', get);
+            }
+            const formatted = formatter.format(code_template);
+            fs.writeFileSync(`./application/v1/controller/apigateway/${i === 0 ? 'index' : key}.js`, formatted, {encoding:'utf8',flag:'w'}, function(err) {
+                if (err) {
+                    return console.log(err);
+                }
+                console.log("The file was saved!");
+            });
+            // for(const get in gets) {
+
+            // }
+        }
+
+        Promise.resolve(true);
     }
 
     async factories() {
