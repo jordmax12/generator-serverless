@@ -66,6 +66,14 @@ class Config {
         return string.charAt(0).toUpperCase() + string.slice(1);
     }
 
+    underscoreToAllCaps(string) {
+        return this.jsUcfirst(string.replace(/([-_][a-z])/ig, ($1) => {
+            return $1.toUpperCase()
+              .replace('-', '')
+              .replace('_', '');
+          }));
+    }
+
     async create_directory(path) {
         if (!fs.existsSync(path)){
             fs.mkdirSync(path);
@@ -81,7 +89,9 @@ class Config {
         this.build_directories();
         await this.build_dynamo_db();
         await this.resources();
-        await this.mlc();
+        await this.controller();
+        // await this.logic();
+        // await this.model();
 
         doc.resources = [];
         doc.resources.push('${file(./aws/resources/dynamodb.yml)}');
@@ -289,7 +299,7 @@ class Config {
         });
     }
 
-    async mlc() {
+    async controller() {
         // controller logic
         // build out get, post, put and delete
         // let someData = [{name: 'adman', tag: 'batsman', age: 25}];
@@ -299,24 +309,89 @@ class Config {
             const key = Object.keys(models)[i];
             console.log('logging key', key);
             const model = Object.values(models)[i];
-            const { gets } = model;
+            const { gets, methods } = model;
             let code_template = `const validator = require('../../logic/validator');
             const ${this.jsUcfirst(key)} = require('../../logic/${key}');
             const ${key}Factory = require('../../logic/factories/${key}');
+
+            exports.requirements = {
+                post: {
+                    requiredBody: 'v1-post-${key}-model'
+                },
+                patch: {
+                    requiredBody: 'v1-patch-${key}-model'
+                }
+            };
             
             exports.get = async (request, response) => {
                 if (validator.isValid${this.jsUcfirst(key)}Request(request, response)) {
                     if(request.params.${key}_id) {
                         const ${key} = await ${key}Factory.getById(request.params.${key}_id)
                         response.body = ${key}.export();
-                    }
-                }
-            }`;
+                    }`;
 
             for(const get of gets) {
                 console.log('logging get', get);
+                code_template += `else if(request.params.${get}) {
+                    const ${key} = await ${key}Factory.getBy${this.underscoreToAllCaps(get)}(request.params.${get})
+                    response.body = ${key}.export();
+                }`
             }
+            code_template += `}};`;
+            for(const method of methods) {
+                console.log('logging method', method);
+                switch(method) {
+                    case 'post':
+                        code_template += `
+                        
+                        exports.post = async (request, response) => {
+                            const ${key} = new ${this.jsUcfirst(key)}(request.body);
+                            try {
+                                response.body = await ${key}.create(request.authorizer['x-cognito-username']);
+                            } catch (error) {
+                                console.log(error);
+                                response.code = 400;
+                                response.setError('${key}_error', \`There was a problem creating your ${key}: \${error.message}\`);
+                            }
+                            return response;
+                        };`;
+                        break;
+                    case 'patch':
+                        code_template += `
+                        
+                        exports.patch = async (request, response) => {
+                                if (await validator.${key}Exists(request.body.${key}_id, response)) {
+                                    const ${key} = await ${key}Factory.getById(request.body.${key}_id);
+                                    ${key}.merge(request.body);
+                                    try {
+                                        response.body = await ${key}.update(request.authorizer['x-cognito-username']);
+                                    } catch (error) {
+                                        console.log(error);
+                                        response.code = 409;
+                                        response.setError('data_conflict', \`Failed to update data: \${error.message}\`);
+                                    }
+                                }
+                                return response;
+                            };`;
+                        break;
+                    case 'delete':
+                        code_template += `
+                        
+                        exports.delete = async (request, response) => {
+                            if (await validator.${key}Exists(request.params.${key}_id, response)) {
+                                await ${key}Factory.remove(request.params.${key}_id, request.authorizer['x-cognito-username']);
+                                response.body = undefined;
+                            }
+                            return response;
+                        };`;
+                        break;
+                    default:
+                        break;
+                }
+            }
+            console.log('logging code_template', code_template)
             const formatted = formatter.format(code_template);
+            
             fs.writeFileSync(`./application/v1/controller/apigateway/${i === 0 ? 'index' : key}.js`, formatted, {encoding:'utf8',flag:'w'}, function(err) {
                 if (err) {
                     return console.log(err);
