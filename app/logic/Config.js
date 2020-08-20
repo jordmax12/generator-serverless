@@ -90,7 +90,8 @@ class Config {
         await this.build_dynamo_db();
         await this.resources();
         await this.controller();
-        // await this.logic();
+        await this.factories();
+        await this.logics();
         // await this.model();
 
         doc.resources = [];
@@ -300,14 +301,9 @@ class Config {
     }
 
     async controller() {
-        // controller logic
-        // build out get, post, put and delete
-        // let someData = [{name: 'adman', tag: 'batsman', age: 25}];
-        // let jsonData = JSON.stringify(someData);
         const { models } = this._config;
         for(let i = 0; i < Object.keys(models).length; i++) {
             const key = Object.keys(models)[i];
-            console.log('logging key', key);
             const model = Object.values(models)[i];
             const { gets, methods } = model;
             let code_template = `const validator = require('../../logic/validator');
@@ -339,7 +335,6 @@ class Config {
             }
             code_template += `}};`;
             for(const method of methods) {
-                console.log('logging method', method);
                 switch(method) {
                     case 'post':
                         code_template += `
@@ -389,7 +384,6 @@ class Config {
                         break;
                 }
             }
-            console.log('logging code_template', code_template)
             const formatted = formatter.format(code_template);
             
             fs.writeFileSync(`./application/v1/controller/apigateway/${i === 0 ? 'index' : key}.js`, formatted, {encoding:'utf8',flag:'w'}, function(err) {
@@ -398,15 +392,151 @@ class Config {
                 }
                 console.log("The file was saved!");
             });
-            // for(const get in gets) {
-
-            // }
         }
 
         Promise.resolve(true);
     }
 
     async factories() {
+        const { models } = this._config;
+        for(let i = 0; i < Object.keys(models).length; i++) {
+            const key = Object.keys(models)[i];
+            const model = Object.values(models)[i];
+            const { gets, ddb_config } = model;
+            let code_template = `const ${key}Model = require('../../model/${key}');
+            const ${this.jsUcfirst(key)} = require('../${key}');
+            `;
+
+            if(ddb_config && ddb_config.range) {
+                code_template += `
+                exports.getById = async (${key}_id, ${ddb_config.range}_id) => {
+                        const result = await ${key}Model.getById(${key}_id, ${ddb_config.range}_id);
+                        return new ${this.jsUcfirst(key)}(result);
+                };
+                `
+            } else {
+                code_template += `
+                exports.getById = async (${key}_id) => {
+                        const result = await ${key}Model.getById(${key}_id);
+                        return new ${this.jsUcfirst(key)}(result);
+                };
+                `
+            }
+
+            for (const get of gets) {
+                code_template += `
+                exports.getBy${this.underscoreToAllCaps(get)} = async (${get}_id) => {
+                    const result = await ${get}Model.getById(${get}_id);
+                    return new ${this.jsUcfirst(get)}(result);
+                };`
+            }
+            const formatted = formatter.format(code_template);
+            
+            fs.writeFileSync(`./application/v1/logic/factories/${key}.js`, formatted, {encoding:'utf8',flag:'w'}, function(err) {
+                if (err) {
+                    return console.log(err);
+                }
+                console.log("The file was saved!");
+            });
+            
+        }
+
+        Promise.resolve(true);
+    }
+
+    async logics() {
+        const { models } = this._config;
+        for(let i = 0; i < Object.keys(models).length; i++) {
+            const key = Object.keys(models)[i];
+            console.log('logging key', key);
+            const model = Object.values(models)[i];
+            const { gets, ddb_config } = model;
+            let code_template = `const {v4: uuidv4} = require('uuid');
+            const ${key}Model = require('../model/${key}');
+
+            class ${this.jsUcfirst(key)} {
+                constructor(${key}) {
+                    this._${key} = {
+                        ${key}_id: ${key}.${key}_id || uuidv4(),
+            `;
+
+            for(const get of gets) {
+                code_template += `
+                ${get}: ${key}.${get} || '',`
+            }
+
+            code_template += `
+                    created: ${key}.created || new Date().toISOString(),
+                    modified: ${key}.modified || new Date().toISOString()
+                };
+            }
+
+            get ${key}_id() {
+                return this._${key}.${key}_id;
+            }
+            `
+
+            for(const get of gets) {
+                code_template += `
+                get ${get}() {
+                    return this._${key}.${get};
+                }
+            
+                set ${get}(${get}) {
+                    this._${key}.${get} = ${get};
+                }
+                `
+            }
+
+            code_template += `
+
+            get created() {
+                return this._company.created;
+            }
+        
+            get modified() {
+                return this._company.modified;
+            }
+
+            export() {
+                return this._${key};
+            }
+        
+            merge(new${this.jsUcfirst(key)}Obj) {
+                for (const property in this._${key}) {
+                    if (new${this.jsUcfirst(key)}Obj[property]) {
+                        this._${key}[property] = new${this.jsUcfirst(key)}Obj[property];
+                    }
+                }
+            }
+        
+            async create(author_id) {
+                const ${key} = await ${key}Model.create(this._${key}, author_id);
+                return ${key};
+            }
+        
+            async update(author_id) {
+                const originalVersionKey = this._${key}.modified;
+                this._${key}.modified = new Date().toISOString();
+                const ${key} = await ${key}Model.update(this._${key}, originalVersionKey, author_id);
+                return ${key};
+            }
+        }
+
+        module.exports = ${this.jsUcfirst(key)};`
+        console.log('logging code_template', code_template);
+        const formatted = formatter.format(code_template);
+            
+        fs.writeFileSync(`./application/v1/logic/${key}.js`, formatted, {encoding:'utf8',flag:'w'}, function(err) {
+            if (err) {
+                return console.log(err);
+            }
+            console.log("The file was saved!");
+        });
+        }
+    }
+
+    async models() {
 
     }
 
