@@ -61,13 +61,13 @@ class Config {
         this._config.models = models;
     }
 
-    jsUcfirst(string) 
+    UcFirst(string) 
     {
         return string.charAt(0).toUpperCase() + string.slice(1);
     }
 
     underscoreToAllCaps(string) {
-        return this.jsUcfirst(string.replace(/([-_][a-z])/ig, ($1) => {
+        return this.UcFirst(string.replace(/([-_][a-z])/ig, ($1) => {
             return $1.toUpperCase()
               .replace('-', '')
               .replace('_', '');
@@ -92,7 +92,7 @@ class Config {
         await this.controller();
         await this.factories();
         await this.logics();
-        // await this.model();
+        await this.models();
 
         doc.resources = [];
         doc.resources.push('${file(./aws/resources/dynamodb.yml)}');
@@ -229,7 +229,7 @@ class Config {
                 }
             }
 
-            final.Resources[this.jsUcfirst(key)] = resource;
+            final.Resources[this.UcFirst(key)] = resource;
           }
 
         return fs.writeFile('./aws/resources/dynamodb.yml', yaml.safeDump(final), (err) => {
@@ -307,7 +307,7 @@ class Config {
             const model = Object.values(models)[i];
             const { gets, methods } = model;
             let code_template = `const validator = require('../../logic/validator');
-            const ${this.jsUcfirst(key)} = require('../../logic/${key}');
+            const ${this.UcFirst(key)} = require('../../logic/${key}');
             const ${key}Factory = require('../../logic/factories/${key}');
 
             exports.requirements = {
@@ -320,7 +320,7 @@ class Config {
             };
             
             exports.get = async (request, response) => {
-                if (validator.isValid${this.jsUcfirst(key)}Request(request, response)) {
+                if (validator.isValid${this.UcFirst(key)}Request(request, response)) {
                     if(request.params.${key}_id) {
                         const ${key} = await ${key}Factory.getById(request.params.${key}_id)
                         response.body = ${key}.export();
@@ -340,7 +340,7 @@ class Config {
                         code_template += `
                         
                         exports.post = async (request, response) => {
-                            const ${key} = new ${this.jsUcfirst(key)}(request.body);
+                            const ${key} = new ${this.UcFirst(key)}(request.body);
                             try {
                                 response.body = await ${key}.create(request.authorizer['x-cognito-username']);
                             } catch (error) {
@@ -404,21 +404,21 @@ class Config {
             const model = Object.values(models)[i];
             const { gets, ddb_config } = model;
             let code_template = `const ${key}Model = require('../../model/${key}');
-            const ${this.jsUcfirst(key)} = require('../${key}');
+            const ${this.UcFirst(key)} = require('../${key}');
             `;
 
             if(ddb_config && ddb_config.range) {
                 code_template += `
                 exports.getById = async (${key}_id, ${ddb_config.range}_id) => {
-                        const result = await ${key}Model.getById(${key}_id, ${ddb_config.range}_id);
-                        return new ${this.jsUcfirst(key)}(result);
+                    const result = await ${key}Model.getById(${key}_id, ${ddb_config.range}_id);
+                    return new ${this.UcFirst(key)}(result);
                 };
                 `
             } else {
                 code_template += `
                 exports.getById = async (${key}_id) => {
-                        const result = await ${key}Model.getById(${key}_id);
-                        return new ${this.jsUcfirst(key)}(result);
+                    const result = await ${key}Model.getById(${key}_id);
+                    return new ${this.UcFirst(key)}(result);
                 };
                 `
             }
@@ -426,8 +426,8 @@ class Config {
             for (const get of gets) {
                 code_template += `
                 exports.getBy${this.underscoreToAllCaps(get)} = async (${get}_id) => {
-                    const result = await ${get}Model.getById(${get}_id);
-                    return new ${this.jsUcfirst(get)}(result);
+                    const result = await ${get}Model.getBy${this.underscoreToAllCaps(get)}(${get}_id);
+                    return new ${this.UcFirst(get)}(result);
                 };`
             }
             const formatted = formatter.format(code_template);
@@ -454,7 +454,7 @@ class Config {
             let code_template = `const {v4: uuidv4} = require('uuid');
             const ${key}Model = require('../model/${key}');
 
-            class ${this.jsUcfirst(key)} {
+            class ${this.UcFirst(key)} {
                 constructor(${key}) {
                     this._${key} = {
                         ${key}_id: ${key}.${key}_id || uuidv4(),
@@ -490,54 +490,225 @@ class Config {
 
             code_template += `
 
-            get created() {
-                return this._company.created;
-            }
-        
-            get modified() {
-                return this._company.modified;
-            }
+                get created() {
+                    return this._company.created;
+                }
+            
+                get modified() {
+                    return this._company.modified;
+                }
 
-            export() {
-                return this._${key};
-            }
-        
-            merge(new${this.jsUcfirst(key)}Obj) {
-                for (const property in this._${key}) {
-                    if (new${this.jsUcfirst(key)}Obj[property]) {
-                        this._${key}[property] = new${this.jsUcfirst(key)}Obj[property];
+                export() {
+                    return this._${key};
+                }
+            
+                merge(new${this.UcFirst(key)}Obj) {
+                    for (const property in this._${key}) {
+                        if (new${this.UcFirst(key)}Obj[property]) {
+                            this._${key}[property] = new${this.UcFirst(key)}Obj[property];
+                        }
                     }
                 }
-            }
-        
-            async create(author_id) {
-                const ${key} = await ${key}Model.create(this._${key}, author_id);
-                return ${key};
-            }
-        
-            async update(author_id) {
-                const originalVersionKey = this._${key}.modified;
-                this._${key}.modified = new Date().toISOString();
-                const ${key} = await ${key}Model.update(this._${key}, originalVersionKey, author_id);
-                return ${key};
-            }
-        }
-
-        module.exports = ${this.jsUcfirst(key)};`
-        console.log('logging code_template', code_template);
-        const formatted = formatter.format(code_template);
             
-        fs.writeFileSync(`./application/v1/logic/${key}.js`, formatted, {encoding:'utf8',flag:'w'}, function(err) {
-            if (err) {
-                return console.log(err);
+                async create(author_id) {
+                    const ${key} = await ${key}Model.create(this._${key}, author_id);
+                    return ${key};
+                }
+            
+                async update(author_id) {
+                    const originalVersionKey = this._${key}.modified;
+                    this._${key}.modified = new Date().toISOString();
+                    const ${key} = await ${key}Model.update(this._${key}, originalVersionKey, author_id);
+                    return ${key};
+                }
             }
-            console.log("The file was saved!");
-        });
+
+            module.exports = ${this.UcFirst(key)};`
+            console.log('logging code_template', code_template);
+            const formatted = formatter.format(code_template);
+                
+            fs.writeFileSync(`./application/v1/logic/${key}.js`, formatted, {encoding:'utf8',flag:'w'}, function(err) {
+                if (err) {
+                    return console.log(err);
+                }
+                console.log("The file was saved!");
+            });
         }
     }
 
     async models() {
+        const { models } = this._config;
+        for(let i = 0; i < Object.keys(models).length; i++) {
+            const key = Object.keys(models)[i];
+            const model = Object.values(models)[i];
+            const { gets, ddb_config } = model;
+            let code_template = `const dataAdapter = require('syngenta-data-adapter');
 
+            const _getAdapter = async (user_id = 'not-needed') => {
+                const adapter = await dataAdapter.getAdapter({
+                    engine: 'dynamodb',
+                    endpoint: process.env.DYNAMODB_ENDPOINT,
+                    region: process.env.AWS_REGION,
+                    table: process.env.DYNAMODB_${key.toUpperCase()},
+                    modelSchema: 'v1-${key}-model',
+                    modelIdentifier: '${key}_id',
+                    modelVersionKey: 'modified',
+                    appIdentifier: process.env.APP_NAME,
+                    authorIdentifier: user_id,
+                    revisionArn: process.env.SNS_REVISION_RECORDS
+                });
+                return adapter;
+            };
+
+            exports.create = async (${key}, author_id) => {
+                const adapter = await _getAdapter(author_id);
+                const result = await adapter.insert({
+                    data: ${key}
+                });
+                return result;
+            };
+            `;
+
+            if(ddb_config && ddb_config.range) {
+                code_template += `
+                exports.update = async (${key}, originalVersionKey, author_id) => {
+                    const adapter = await _getAdapter(author_id);
+                    const result = await adapter.update({
+                        data: ${key},
+                        updateRetrieveOperation: 'get',
+                        originalVersionKey,
+                        query: {
+                            Key: {
+                                ${key}_id: ${key}.${key}_id,
+                                ${ddb_config.range}_id: ${key}.${ddb_config.range}_id
+                            }
+                        }
+                    });
+                    return result;
+                };
+                
+                exports.delete = async (${key}_id, ${ddb_config.range}_id, author_id) => {
+                    const adapter = await _getAdapter(author_id);
+                    const result = await adapter.delete({
+                        query: {
+                            Key: {
+                                ${key}_id,
+                                ${ddb_config.range}_id
+                            }
+                        }
+                    });
+                    return result;
+                };
+
+                exports.getAll = async (last_${key}_id = null, limit = 10) => {
+                    const adapter = await _getAdapter();
+                    const query = {
+                        Limit: limit
+                    };
+                    if (last_${key}_id) {
+                        query.ExclusiveStartKey = last_${key}_id;
+                    }
+                    const results = await adapter.scan({query});
+                    return results;
+                };
+                
+                exports.getById = async (${key}_id, ${ddb_config.range}_id) => {
+                    const adapter = await _getAdapter();
+                    const result = await adapter.get({
+                        query: {
+                            Key: {
+                                ${key}_id,
+                                ${ddb_config.range}_id
+                            }
+                        }
+                    });
+                    return result;
+                };
+                `
+            } else {
+                code_template += `
+                exports.update = async (${key}, originalVersionKey, author_id) => {
+                    const adapter = await _getAdapter(author_id);
+                    const result = await adapter.update({
+                        data: ${key},
+                        updateRetrieveOperation: 'get',
+                        originalVersionKey,
+                        query: {
+                            Key: {
+                                ${key}_id: ${key}.${key}_id
+                            }
+                        }
+                    });
+                    return result;
+                };
+                
+                exports.delete = async (${key}_id, author_id) => {
+                    const adapter = await _getAdapter(author_id);
+                    const result = await adapter.delete({
+                        query: {
+                            Key: {
+                                ${key}_id
+                            }
+                        }
+                    });
+                    return result;
+                };
+
+                exports.getAll = async (last_${key}_id = null, limit = 10) => {
+                    const adapter = await _getAdapter();
+                    const query = {
+                        Limit: limit
+                    };
+                    if (last_${key}_id) {
+                        query.ExclusiveStartKey = last_${key}_id;
+                    }
+                    const results = await adapter.scan({query});
+                    return results;
+                };
+                
+                exports.getById = async (${key}_id) => {
+                    const adapter = await _getAdapter();
+                    const result = await adapter.get({
+                        query: {
+                            Key: {
+                                ${key}_id
+                            }
+                        }
+                    });
+                    return result;
+                };
+                `
+            }
+
+            for (const get of gets) {
+                code_template += `
+                exports.getBy${this.underscoreToAllCaps(get)} = async (${get}) => {
+                    const adapter = await _getAdapter('some-user-id');
+                    const result = await adapter.query({
+                        query: {
+                            IndexName: '${get}',
+                            Limit: 1,
+                            KeyConditionExpression: \`${get} = :${get}\`,
+                            ExpressionAttributeValues: {
+                                ':${get}': ${get}
+                            }
+                        }
+                    });
+                    return result && result.length > 0 ? result[0] : null;
+                };`
+            }
+            const formatted = formatter.format(code_template);
+            
+            fs.writeFileSync(`./application/v1/model/${key}.js`, formatted, {encoding:'utf8',flag:'w'}, function(err) {
+                if (err) {
+                    return console.log(err);
+                }
+                console.log("The file was saved!");
+            });
+            
+        }
+
+        Promise.resolve(true);
     }
 
     async validator() {
