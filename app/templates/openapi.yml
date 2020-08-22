@@ -1,0 +1,202 @@
+openapi: 3.0.0
+info:
+    title: Fields API
+    version: 1.0.0
+    description: fields api
+    contact:
+        name: Syngenta DPE USCO
+        email: syngenta.dpe.usco@gmail.com
+        url: https://developer.syngenta.com/
+tags:
+    -
+        name: fields
+        description: just an fields API
+servers:
+    -
+        url: https://prod-api-enogen-sellers.syndpe.com/fields
+        description: PROD
+    -
+        url: https://uat-api-enogen-sellers.syndpe.com/fields
+        description: UAT
+    -
+        url: https://qa-api-enogen-sellers.syndpe.com/fields
+        description: QA
+    -
+        url: https://dev-api-enogen-sellers.syndpe.com/fields
+        description: DEV
+paths:
+    /v1:
+        post:
+            tags:
+                - fields
+            operationId: PostField
+            deprecated: false
+            summary: Create a field
+            description: body of the request
+            parameters:
+                - $ref: '#/x-custom/headers/x-app-id'
+                - $ref: '#/x-custom/headers/x-user-token'
+                - $ref: '#/x-custom/headers/x-api-key'
+            requestBody:
+                required: true
+                description: field data
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/v1-post-fields-request'
+            responses:
+                201:
+                    description: Greeting successfully posted
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/v1-fields-response'
+                400:
+                    description: Malformed request
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/v1-400-error-response'
+                401:
+                    description: Unathorized request
+        patch:
+            tags:
+                - fields
+            operationId: PatchField
+            deprecated: false
+            summary: Update an fields
+            description: body of the request
+            parameters:
+                - $ref: '#/x-custom/headers/x-app-id'
+                - $ref: '#/x-custom/headers/x-user-token'
+                - $ref: '#/x-custom/headers/x-api-key'
+            requestBody:
+                required: true
+                description: field data
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/v1-patch-fields-request'
+            responses:
+                201:
+                    description: Greeting successfully posted
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/v1-fields-response'
+                400:
+                    description: Malformed request
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/v1-400-error-response'
+                401:
+                    description: Unathorized request
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/v1-400-error-response'
+                409:
+                    description: Data model conflict
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/v1-409-error-response'
+    /v1/ingest-tracker:
+        post:
+            tags:
+                - ingest-tracker
+            operationId: PostIngestTracker
+            deprecated: false
+            summary: Create a Ingest Tracker
+            description: body of the request
+            parameters:
+                - $ref: '#/x-custom/headers/x-app-id'
+                - $ref: '#/x-custom/headers/x-user-token'
+                - $ref: '#/x-custom/headers/x-api-key'
+            requestBody:
+                required: true
+                description: ingest tracker data
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/v1-post-ingest-tracker-request'
+            responses:
+                201:
+                    description: Greeting successfully posted
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/v1-ingest-tracker-response'
+                400:
+                    description: Malformed request
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/v1-400-error-response'
+                401:
+                    description: Unathorized request
+components:
+    schemas:
+        v1-400-error-response:
+            title: v1-400-error-response
+            type: object
+            properties:
+                errors:
+                    type: array
+                    items:
+                       type: string
+                       minLength: 1
+        v1-409-error-response:
+            title: v1-409-error-response
+            type: object
+            allOf:
+                - $ref: '#/components/schemas/v1-400-error-response'
+                - properties:
+                      current_model:
+                          type: object
+    securitySchemes:
+        x-app-id:
+            type: apiKey
+            in: header
+            name: x-app-id
+            description: the name of the app making the request
+        x-user-token:
+            type: apiKey
+            in: header
+            name: x-user-token
+            description: the sso token from syngenta users
+        x-api-key:
+            type: apiKey
+            name: x-api-key
+            in: header
+            description: an api key
+security:
+    -
+        x-app-id: []
+        x-user-token: []
+    -
+        x-api-key: []
+x-custom:
+    headers:
+        x-app-id:
+            name: x-app-id
+            in: header
+            required: true
+            description: the name of the app making the request
+            schema:
+                type: string
+        x-user-token:
+            name: x-user-token
+            in: header
+            required: false
+            description: public token for outside users (only must send thie or x-api-key)
+            schema:
+                type: string
+        x-api-key:
+            name: x-api-key
+            in: header
+            required: false
+            description: an api key (only must send thie or x-user-token)
+            schema:
+                type: string

@@ -90,6 +90,7 @@ class Config {
         await this.build_dynamo_db();
         await this.resources();
         await this.controller();
+        await this.build_router();
         await this.factories();
         await this.validator();
         await this.logics();
@@ -241,6 +242,31 @@ class Config {
 
             Promise.resolve(true);
         });
+    }
+
+    async build_router() {
+        const code_template = `const {Router} = require('syngenta-lambda-client').apigateway;
+
+        exports.route = (event) => {
+            const router = new Router({
+                event,
+                app: process.env.APP_NAME,
+                service: process.env.SERVICE,
+                version: 'v1',
+                handlerPath: 'application/v1/controller/apigateway'
+            });
+            return router.route();
+        };`
+
+        const formatted = formatter.format(code_template);
+            
+        fs.writeFileSync(`./application/v1/controller/apigateway/_router.js`, formatted, {encoding:'utf8',flag:'w'}, function(err) {
+            if (err) {
+                return console.log(err);
+            }
+            console.log("The file was saved!");
+        });
+
     }
 
     async resources() {
@@ -866,8 +892,105 @@ class Config {
         
     }
 
-    async open_api() {
+    async package_json() {
+        const { models } = this._config;
+        for(let i = 0; i < Object.keys(models).length; i++) {
+            const key = Object.keys(models)[i];
+            const model = Object.values(models)[i];
+            const { gets, ddb_config } = model;
+        }
+    }
 
+    async open_api() {
+        const { models } = this._config;
+        const api_title = Object.keys(models)[0];
+        const template = {
+            openapi: "3.0.0",
+            info: {
+               title: `${this.UcFirst(api_title)} API`,
+               version: "1.0.0",
+               description: `${api_title} api`,
+               contact: {
+                  name: "Syngenta DPE USCO",
+                  email: "syngenta.dpe.usco@gmail.com",
+                  url: "https://developer.syngenta.com/"
+               }
+            },
+            tags: [
+               {
+                  name: `${api_title}`,
+                  description: `just an ${api_title} API`
+               }
+            ],
+            servers: [
+               {
+                  url: `https://prod-api-enogen-sellers.syndpe.com/${api_title}`,
+                  description: "PROD"
+               },
+               {
+                  url: `https://uat-api-enogen-sellers.syndpe.com/${api_title}`,
+                  description: "UAT"
+               },
+               {
+                  url: `https://qa-api-enogen-sellers.syndpe.com/${api_title}`,
+                  description: "QA"
+               },
+               {
+                  url: `https://dev-api-enogen-sellers.syndpe.com/${api_title}`,
+                  description: "DEV"
+               }
+            ],
+            paths: {
+               '/v1': {
+                  post: null
+               }
+            },
+            components: {
+                schemas: {
+
+                }
+            },
+            security: [
+                {
+                   'x-app-id': [],
+                   'x-user-token': []
+                },
+                {
+                   'x-api-key': []
+                }
+             ],
+             'x-custom': {
+                headers: {
+                  ' x-app-id': {
+                      name: "x-app-id",
+                      in: "header",
+                      required: true,
+                      description: "the name of the app making the request",
+                      schema: {
+                         type: "string"
+                      }
+                   },
+                   "x-user-token": {
+                      name: "x-user-token",
+                      in: "header",
+                      required: false,
+                      description: "public token for outside users (only must send thie or x-api-key)",
+                      schema: {
+                         type: "string"
+                      }
+                   },
+                   "x-api-key": {
+                      "name": "x-api-key",
+                      in: "header",
+                      required: false,
+                      description: "an api key (only must send thie or x-user-token)",
+                      schema: {
+                         type: "string"
+                      }
+                   }
+                }
+             }
+         }
     }
 
     async buildspec() {
