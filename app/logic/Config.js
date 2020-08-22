@@ -91,8 +91,10 @@ class Config {
         await this.resources();
         await this.controller();
         await this.factories();
+        await this.validator();
         await this.logics();
         await this.models();
+        await this.validator();
 
         doc.resources = [];
         doc.resources.push('${file(./aws/resources/dynamodb.yml)}');
@@ -355,7 +357,7 @@ class Config {
                         code_template += `
                         
                         exports.patch = async (request, response) => {
-                                if (await validator.${key}Exists(request.body.${key}_id, response)) {
+                                if (await validator.${key}ExistsById(request, response)) {
                                     const ${key} = await ${key}Factory.getById(request.body.${key}_id);
                                     ${key}.merge(request.body);
                                     try {
@@ -373,7 +375,7 @@ class Config {
                         code_template += `
                         
                         exports.delete = async (request, response) => {
-                            if (await validator.${key}Exists(request.params.${key}_id, response)) {
+                            if (await validator.${key}ExistsById(request, response)) {
                                 await ${key}Factory.remove(request.params.${key}_id, request.authorizer['x-cognito-username']);
                                 response.body = undefined;
                             }
@@ -712,7 +714,156 @@ class Config {
     }
 
     async validator() {
+        // for each keyExistsBy for each getter
+        // is unique call isUniqueKey
+        let code_template = '';
+        const { models } = this._config;
+        for(let i = 0; i < Object.keys(models).length; i++) {
+            const key = Object.keys(models)[i];
+            const model = Object.values(models)[i];
+            const { gets, ddb_config } = model;
+            code_template += `const ${key}Model = require('../model/${key}');
+            const ${key}Factory = require('./factories/${key}');
+            `;
+        }
 
+        for(let i = 0; i < Object.keys(models).length; i++) {
+            // get by id, figure out if range
+            const key = Object.keys(models)[i];
+            const model = Object.values(models)[i];
+            const { gets, ddb_config } = model;
+
+
+
+            if(ddb_config && ddb_config.range) {
+                let valid_request_if_statements = `if(${key}_id && ${ddb_config.range}_id) found_valid_param.push('${key}_id;${ddb_config.range}_id');`;
+
+                for (const get of gets) {
+                    valid_request_if_statements += `
+                    if(${get}) found_valid_param.push('${get}');`
+                }
+
+                code_template += `
+
+                exports.isValid${this.UcFirst(key)}Request = async (request, response) => {
+                    const {${gets.join(',')}} = request.params;
+                    const found_valid_param = [];
+
+                    ${valid_request_if_statements}
+
+                    if (found_valid_param.length > 1) {
+                        response.code = 403;
+                        response.setError(
+                            '${key}_id;${ddb_config.range}_id,${gets.join(',')}',
+                            'only one get request parameter allowed for this request.'
+                        );
+                    }
+
+                    return !response.hasErrors;
+                };
+
+                exports.isUnique${this.UcFirst(key)} = async (request, response) => {
+                    const result = await ${key}Model.getById(request.body.${key}_id, request.body.${ddb_config.range}_id);
+                    if (result && result.${key}_id) {
+                        response.code = 400;
+                        response.setError(
+                            '${key}_id;${ddb_config.range}_id;',
+                            \`${key} with ${key}_id \${request.body.${key}_id} and ${ddb_config.range}_id \${request.body.${ddb_config.range}_id} already exists.\`
+                        );
+                    }
+                    return !response.hasErrors;
+                };
+                
+                exports.${key}ExistsById = async (request, response) => {
+                    const ${key}_id = request.params.${key}_id || request.body.${key}_id;
+                    const ${key} = await ${key}Model.getById(${key}_id, request.params.${ddb_config.range}_id);
+                    if (!${key}) {
+                        response.code = 404;
+                        response.setError('${key}', \`${key} with ${key}_id \${${key}_id} and ${ddb_config.range}_id \${request.params.${ddb_config.range}_id} does not exist\`);
+                    }
+                    return !response.hasErrors;
+                }
+                
+                `
+            } else {
+                let valid_request_if_statements = `if(${key}_id) found_valid_param.push('${key}_id');
+                `;
+
+                for (const get of gets) {
+                    valid_request_if_statements += `if(${get}) found_valid_param.push('${get}');
+                    `
+                }
+
+                code_template += `
+
+                exports.isValid${this.UcFirst(key)}Request = async (request, response) => {
+                    const {${gets.join(',')}} = request.params;
+                    const found_valid_param = [];
+
+                    ${valid_request_if_statements}
+
+                    if (found_valid_param.length > 1) {
+                        response.code = 403;
+                        response.setError(
+                            '${key}_id,${gets.join(',')}',
+                            'only one get request parameter allowed for this request.'
+                        );
+                    }
+
+                    return !response.hasErrors;
+                };
+
+                exports.isUnique${this.UcFirst(key)} = async (request, response) => {
+                    const result = await ${key}Model.getById(request.body.${key}_id);
+                    if (result && result.${key}_id) {
+                        response.code = 400;
+                        response.setError(
+                            '${key}_id',
+                            \`${key} with ${key}_id \${request.body.${key}_id} already exists.\`
+                        );
+                    }
+                    return !response.hasErrors;
+                };
+                
+                exports.${key}ExistsById = async (request, response) => {
+                    const ${key}_id = request.params.${key}_id || request.body.${key}_id;
+                    const ${key} = await ${key}Model.getById(${key}_id);
+                    if (!${key}) {
+                        response.code = 404;
+                        response.setError('${key}', \`${key} with ${key}_id \${${key}_id} does not exist\`);
+                    }
+                    return !response.hasErrors;
+                }
+                
+                `
+            }
+
+            for (const get of gets) {
+                code_template += `exports.${key}ExistsBy${this.UcFirst(get)} = async (request, response) => {
+                    const ${key} = await ${key}Model.getBy${this.UcFirst(get)}(request.params.${get});
+                    if (!${key}) {
+                        response.code = 404;
+                        response.setError('${get}', \`${key} with ${get} \${request.params.${get}} does not exist\`);
+                    }
+                    return !response.hasErrors;
+                }
+                
+                `;
+            }
+        }
+
+        console.log('logging code_template', code_template);
+        const formatted = formatter.format(code_template);
+        
+        return fs.writeFileSync(`./application/v1/logic/validator.js`, formatted, {encoding:'utf8',flag:'w'}, function(err) {
+            if (err) {
+                return console.log(err);
+            }
+            console.log("The file was saved!");
+            Promise.resolve(true);
+        });
+
+        
     }
 
     async open_api() {
