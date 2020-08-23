@@ -1,6 +1,6 @@
 {
   "name": "generator-serverless-j",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Below are the steps required to run this app local.",
   "main": "index.js",
   "scripts": {
