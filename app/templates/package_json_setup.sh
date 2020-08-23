@@ -23,4 +23,5 @@ npm install --save-dev serverless@^1.72.0
 npm install --save-dev serverless-offline@5.12.1
 npm install --save-dev serverless-plugin-bind-deployment-id@~1.2.0
 npm install --save-dev serverless-plugin-log-retention@^2.0.0
-npm install --save-dev syngenta-cloud-tool@^1.4.
+npm install --save-dev syngenta-cloud-tool@^1.4.4
+npm install --save-dev concurrently@^5.2.0

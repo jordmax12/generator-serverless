@@ -902,7 +902,11 @@ class Config {
           });
         const shell = require('shelljs')
 
-        shell.exec(`${path.join(__dirname, '..')}/templates/package_json_setup.sh`)
+        shell.exec(`${path.join(__dirname, '..')}/templates/package_json_setup.sh`);
+        let _package = JSON.parse(fs.readFileSync('./package.json', 'utf8'));
+        delete _package.scripts.test;
+        _package.scripts.start = `concurrently \"serverless offline start --stage local --aws_envs local --region us-east-2\"`;
+        fs.writeFileSync('./package.json', JSON.stringify(_package, null, 4))
         return true;
     }
 

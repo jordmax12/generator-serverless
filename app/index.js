@@ -11,13 +11,13 @@ module.exports = class extends Generator {
   }
   start() {
     this.log('Do something...');
-    this.prompt([
-      {
-        type    : 'input',
-        name    : 'name',
-        message : 'Enter a name for the new component (i.e.: myNewComponent): '
-      }
-    ]).then(async (answers) => {
+    // this.prompt([
+    //   {
+    //     type    : 'input',
+    //     name    : 'name',
+    //     message : 'Enter a name for the new component (i.e.: myNewComponent): '
+    //   }
+    // ]).then(async (answers) => {
       let fileContents = fs.readFileSync('./jordan.yml', 'utf8');
       let yaml_config = yaml.safeLoad(fileContents);
 
@@ -25,14 +25,7 @@ module.exports = class extends Generator {
 
       await config.serverless_file();
 
-      console.log('logging config', JSON.stringify(config.export(), null, 4));
-
-      this.fs.copyTpl(
-        this.templatePath('index.html'),
-        this.destinationPath(answers.name + '.html'),
-        { message: answers.name}
-      );
       console.log('finished!')
-    });
+    // });
   }
 };
