@@ -1,0 +1,2 @@
+registry=http://npm-proxy.fury.io/syngenta-digital/
+//npm-proxy.fury.io/syngenta-digital/:_authToken=${FURY_AUTH}

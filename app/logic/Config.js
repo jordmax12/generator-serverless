@@ -96,10 +96,11 @@ class Config {
         await this.models();
         await this.validator();
         await this.open_api();
+        await this.package_json();
 
         doc.resources = [];
         doc.resources.push('${file(./aws/resources/dynamodb.yml)}');
-
+        console.log('logging doc', doc);
         return fs.writeFile('./serverless.yml', yaml.safeDump(doc), (err) => {
             if (err) {
                 console.log(err);
@@ -889,12 +890,20 @@ class Config {
     }
 
     async package_json() {
-        const { models } = this._config;
-        for(let i = 0; i < Object.keys(models).length; i++) {
-            const key = Object.keys(models)[i];
-            const model = Object.values(models)[i];
-            const { gets, ddb_config } = model;
-        }
+        // const { models } = this._config;
+        // for(let i = 0; i < Object.keys(models).length; i++) {
+        //     const key = Object.keys(models)[i];
+        //     const model = Object.values(models)[i];
+        //     const { gets, ddb_config } = model;
+        // }
+        fs.copyFile(`${path.join(__dirname, '..')}/templates/npmrc.txt`, './.npmrc', (err) => {
+            if (err) throw err;
+            console.log('source.txt was copied to destination.txt');
+          });
+        const shell = require('shelljs')
+
+        shell.exec(`${path.join(__dirname, '..')}/templates/package_json_setup.sh`)
+        return true;
     }
 
     generate_component_model([key, value]) {
