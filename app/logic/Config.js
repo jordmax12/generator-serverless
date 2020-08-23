@@ -81,7 +81,6 @@ class Config {
     }
 
     async serverless_file() {
-        console.log('logging __dirname', path.join(__dirname, '..'))
         let doc = yaml.safeLoad(fs.readFileSync(`${path.join(__dirname, '..')}/templates/serverless.yml`, 'utf8'));
         doc.app = this._config.app;
         doc.service = this._config.service;
@@ -96,6 +95,7 @@ class Config {
         await this.logics();
         await this.models();
         await this.validator();
+        await this.open_api();
 
         doc.resources = [];
         doc.resources.push('${file(./aws/resources/dynamodb.yml)}');
@@ -355,7 +355,6 @@ class Config {
                     }`;
 
             for(const get of gets) {
-                console.log('logging get', get);
                 code_template += `else if(request.params.${get}) {
                     const ${key} = await ${key}Factory.getBy${this.underscoreToAllCaps(get)}(request.params.${get})
                     response.body = ${key}.export();
@@ -476,7 +475,6 @@ class Config {
         const { models } = this._config;
         for(let i = 0; i < Object.keys(models).length; i++) {
             const key = Object.keys(models)[i];
-            console.log('logging key', key);
             const model = Object.values(models)[i];
             const { gets, ddb_config } = model;
             let code_template = `const {v4: uuidv4} = require('uuid');
@@ -552,7 +550,6 @@ class Config {
             }
 
             module.exports = ${this.UcFirst(key)};`
-            console.log('logging code_template', code_template);
             const formatted = formatter.format(code_template);
                 
             fs.writeFileSync(`./application/v1/logic/${key}.js`, formatted, {encoding:'utf8',flag:'w'}, function(err) {
@@ -878,7 +875,6 @@ class Config {
             }
         }
 
-        console.log('logging code_template', code_template);
         const formatted = formatter.format(code_template);
         
         return fs.writeFileSync(`./application/v1/logic/validator.js`, formatted, {encoding:'utf8',flag:'w'}, function(err) {
@@ -901,49 +897,172 @@ class Config {
         }
     }
 
+    generate_component_model([key, value]) {
+        const { gets, ddb_config } = value;
+        let template = {
+            [`v1-${key}-model`]: {
+                title: `v1-${key}-model`,
+                type: "object",
+                properties: {
+                    [`${key}_id`]: {
+                        "minLength": 1,
+                        "type": "string"
+                    },
+                    created: {
+                        minLength: 1,
+                        type: 'string',
+                        format: 'date-time'
+                    },
+                    modified: {
+                        minLength: 1,
+                        type: 'string',
+                        format: 'date-time'
+                    }
+                },
+            },
+            [`v1-post-${key}-request`]: {
+                title: `v1-post-${key}-request`,
+                allOf: [
+                   {
+                      "$ref": `#/components/schemas/v1-${key}-model`
+                   },
+                   {
+                      required: [
+                         `${key}_id`
+                      ]
+                   }
+                ]
+            },
+            [`v1-${key}-response`]: {
+                title: `v1-${key}-response`,
+                allOf: [
+                    {
+                        "$ref": `#/components/schemas/v1-${key}-model`
+                    },
+                    {
+                        required: []
+                        // [
+                        //     "field_id",
+                        //     "external_reference_id",
+                        //     "field_acres",
+                        //     "field_name",
+                        //     "field_boundary",
+                        //     "farm_id",
+                        //     "farm_name",
+                        //     "grower_id",
+                        //     "grower_salesforce_id",
+                        //     "grower_name",
+                        //     "created",
+                        //     "modified"
+                        // ]
+                    }
+                ]
+            },
+            [`v1-patch-${key}-request`]: {
+                title: `v1-post-${key}-request`,
+                "$ref": `#/components/schemas/v1-${key}-model`
+             }
+        }
+
+        for(const get of gets) {
+            template[`v1-${key}-model`].properties[get] = {
+                "minLength": 1,
+                "type": "string"
+            }
+        }
+
+        if(ddb_config && ddb_config.range) {
+            template[`v1-${key}-model`].properties[`${ddb_config.range}_id`] = {
+                "minLength": 1,
+                "type": "string"
+            }
+
+            template[`v1-post-${key}-request`].allOf[1].required.push(`${ddb_config.range}_id`);
+        }
+
+        return template;
+    }
+
+    generate_openapi_path(method, title) {        
+        // generate_component_model = (key, models, gets, ddb_config)
+        return {
+            tags: [
+                `${title}`
+            ],
+            operationId: `${this.UcFirst(method)}${this.UcFirst(title)}`,
+            deprecated: false,
+            summary: `${method === 'post' ? 'Post' : 'Update'} a ${title}`,
+            description: 'body of the request',
+            parameters: [
+                {
+                    '$ref': '#/x-custom/headers/x-app-id'
+                },
+                {
+                    '$ref': '#/x-custom/headers/x-user-token'
+                },
+                {
+                    '$ref': '#/x-custom/headers/x-api-key'
+                }
+            ],
+            requestBody: {
+                required: true,
+                description: `${title} data`,
+                content: {
+                    'application/json': {
+                        schema: {
+                            '$ref': `#/components/schemas/v1-${method}-${title}-request`
+                        }  
+                    }
+                }
+            }  
+        }
+    }
+
     async open_api() {
         const { models } = this._config;
-        const api_title = Object.keys(models)[0];
+        const [main_model_key, main_model_value] = Object.entries(models)[0];
+        delete models[Object.keys(models)[0]];
         const template = {
             openapi: "3.0.0",
             info: {
-               title: `${this.UcFirst(api_title)} API`,
-               version: "1.0.0",
-               description: `${api_title} api`,
-               contact: {
-                  name: "Syngenta DPE USCO",
-                  email: "syngenta.dpe.usco@gmail.com",
-                  url: "https://developer.syngenta.com/"
-               }
+                title: `${this.UcFirst(main_model_key)} API`,
+                version: "1.0.0",
+                description: `${main_model_key} api`,
+                contact: {
+                    name: "Syngenta DPE USCO",
+                    email: "syngenta.dpe.usco@gmail.com",
+                    url: "https://developer.syngenta.com/"
+                }
             },
             tags: [
-               {
-                  name: `${api_title}`,
-                  description: `just an ${api_title} API`
-               }
+                {
+                    name: `${main_model_key}`,
+                    description: `just an ${main_model_key} API`
+                }
             ],
             servers: [
-               {
-                  url: `https://prod-api-enogen-sellers.syndpe.com/${api_title}`,
-                  description: "PROD"
-               },
-               {
-                  url: `https://uat-api-enogen-sellers.syndpe.com/${api_title}`,
-                  description: "UAT"
-               },
-               {
-                  url: `https://qa-api-enogen-sellers.syndpe.com/${api_title}`,
-                  description: "QA"
-               },
-               {
-                  url: `https://dev-api-enogen-sellers.syndpe.com/${api_title}`,
-                  description: "DEV"
-               }
+                {
+                    url: `https://prod-api-enogen-sellers.syndpe.com/${main_model_key}`,
+                    description: "PROD"
+                },
+                {
+                    url: `https://uat-api-enogen-sellers.syndpe.com/${main_model_key}`,
+                    description: "UAT"
+                },
+                {
+                    url: `https://qa-api-enogen-sellers.syndpe.com/${main_model_key}`,
+                    description: "QA"
+                },
+                {
+                    url: `https://dev-api-enogen-sellers.syndpe.com/${main_model_key}`,
+                    description: "DEV"
+                }
             ],
             paths: {
-               '/v1': {
-                  post: null
-               }
+                '/v1': {
+                    post: null,
+                    patch: null
+                }
             },
             components: {
                 schemas: {
@@ -952,45 +1071,70 @@ class Config {
             },
             security: [
                 {
-                   'x-app-id': [],
-                   'x-user-token': []
+                    'x-app-id': [],
+                    'x-user-token': []
                 },
                 {
-                   'x-api-key': []
+                    'x-api-key': []
                 }
-             ],
-             'x-custom': {
+                ],
+                'x-custom': {
                 headers: {
-                  ' x-app-id': {
-                      name: "x-app-id",
-                      in: "header",
-                      required: true,
-                      description: "the name of the app making the request",
-                      schema: {
-                         type: "string"
-                      }
-                   },
-                   "x-user-token": {
-                      name: "x-user-token",
-                      in: "header",
-                      required: false,
-                      description: "public token for outside users (only must send thie or x-api-key)",
-                      schema: {
-                         type: "string"
-                      }
-                   },
-                   "x-api-key": {
-                      "name": "x-api-key",
-                      in: "header",
-                      required: false,
-                      description: "an api key (only must send thie or x-user-token)",
-                      schema: {
-                         type: "string"
-                      }
-                   }
+                    ' x-app-id': {
+                        name: "x-app-id",
+                        in: "header",
+                        required: true,
+                        description: "the name of the app making the request",
+                        schema: {
+                            type: "string"
+                        }
+                    },
+                    "x-user-token": {
+                        name: "x-user-token",
+                        in: "header",
+                        required: false,
+                        description: "public token for outside users (only must send thie or x-api-key)",
+                        schema: {
+                            type: "string"
+                        }
+                    },
+                    "x-api-key": {
+                        "name": "x-api-key",
+                        in: "header",
+                        required: false,
+                        description: "an api key (only must send thie or x-user-token)",
+                        schema: {
+                            type: "string"
+                        }
+                    }
                 }
-             }
-         }
+                }
+        }
+
+        template.paths['/v1'].post = this.generate_openapi_path('post', main_model_key);
+        template.paths['/v1'].patch = this.generate_openapi_path('patch', main_model_key);
+        let components = this.generate_component_model([main_model_key, main_model_value]);
+
+        for(const model in models) {
+            const model_key = model;
+            const model_value = models[model];
+            console.log('logging model_key', model_key, 'logging model_value', model_value)
+            template.paths[`/v1/${model_key}`] = {};
+            template.paths[`/v1/${model_key}`].post = this.generate_openapi_path('post', model_key);
+            template.paths[`/v1/${model_key}`].patch = this.generate_openapi_path('patch', model_key);
+            const new_components = this.generate_component_model([model_key, model_value]);
+            components = {...components, ...new_components}
+        }
+
+        template.components.schemas = components;
+
+        return fs.writeFile('./openapi.yml', yaml.safeDump(template), (err) => {
+            if (err) {
+                console.log(err);
+            }
+            
+            Promise.resolve(true);
+        });    
     }
 
     async buildspec() {
