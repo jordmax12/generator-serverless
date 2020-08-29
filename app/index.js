@@ -9,7 +9,7 @@ module.exports = class extends Generator {
     super(args, opts);
     this.log('Initializing...');
   }
-  start() {
+  async start() {
     this.log('Do something...');
     // this.prompt([
     //   {
